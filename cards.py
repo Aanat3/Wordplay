@@ -45,10 +45,24 @@ class WikiDeckGame:
             candidates.extend(most_frequent_links(title, limit=6))
         return self._dedupe(candidates)
 
+    def _rank_by_closeness(self, candidates):
+        """Sort candidates so titles that appear directly on the target
+        article's own page come first.
+
+        There's no real graph-distance signal available -- only page links
+        -- so this is a proxy: a title that shows up among the target's own
+        most-frequent links is one hop away from the goal, which is about
+        as "close" as a replacement card can get. Everything else keeps its
+        existing relative order (Python's sort is stable), so the pool
+        doesn't get shuffled, just biased toward the goal.
+        """
+        target_links = {t.lower() for t in most_frequent_links(self.target_title, limit=12)}
+        return sorted(candidates, key=lambda title: title.lower() not in target_links)
+
     def _fill_replacements(self, count):
         """Return up to `count` fresh candidate titles not already in the
         deck or already played, capped so the deck never exceeds
-        MAX_DECK_SIZE."""
+        MAX_DECK_SIZE. Candidates closer to the target are preferred."""
         room = MAX_DECK_SIZE - len(self.deck)
         count = min(count, room)
         if count <= 0:
@@ -56,7 +70,8 @@ class WikiDeckGame:
 
         seen = self._seen_cards()
         replacements = []
-        for candidate in self._candidate_cards():
+        ranked_candidates = self._rank_by_closeness(self._candidate_cards())
+        for candidate in ranked_candidates:
             key = normalize_title(candidate).lower()
             if key in seen:
                 continue
@@ -69,10 +84,12 @@ class WikiDeckGame:
     def discard_cards(self, card_titles):
         """Discard a specific set of cards the player selected from the deck.
 
-        Every 2 cards discarded earns 1 replacement card, rounded down:
-        discarding 1 card earns nothing, discarding 2 earns 1, discarding 3
-        still only earns 1, discarding 4 earns 2, and so on. This rewards
-        discarding in pairs (or more) over discarding one at a time.
+        Every 5 cards discarded earns 1 replacement card, rounded down:
+        discarding 1-4 cards earns nothing, discarding 5-9 earns 1,
+        discarding 10-14 earns 2, and so on. This makes discarding a much
+        steeper trade -- replacements (which are biased toward the target)
+        are earned slowly, so churning the deck is a real cost, not a
+        near-free way to fish for better cards.
         """
         if not card_titles:
             raise ValueError("Select at least one card to discard.")
@@ -99,7 +116,7 @@ class WikiDeckGame:
                     break
         self.deck = remaining
 
-        replacements = self._fill_replacements(len(discarded) // 2)
+        replacements = self._fill_replacements(len(discarded) // 5)
         self.deck.extend(replacements)
 
         return discarded, replacements
