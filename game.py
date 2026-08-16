@@ -741,7 +741,7 @@ class WikiCardGameApp:
         size/font that can't be enlarged."""
 
         dialog = tk.Toplevel(self.root)
-        dialog.title("You Win! ♡")
+        dialog.title("Wiki Card Game ♡")
         dialog.configure(bg=BG)
 
         # This is the actual "size" control -- messagebox has no equivalent.
@@ -833,7 +833,7 @@ class WikiCardGameApp:
 
         self.status_label.configure(
             text="Tap cards to select them, then confirm. "
-                 "Every 2 cards you discard earns 1 replacement card."
+                 "Every 5 cards you discard earns 1 replacement card."
         )
 
         self.refresh_cards()
@@ -906,10 +906,21 @@ class WikiCardGameApp:
 
             self.status_label.configure(
                 text=f"Discarded {len(discarded)} card(s): {discarded_text}. "
-                     "Discard 2 or more at once to earn a replacement card."
+                     "Discard 5 or more at once to earn a replacement card."
             )
 
         self.exit_discard_mode()
+
+        if not self.game.current_cards:
+
+            self.status_label.configure(
+                text="Your deck is empty — you lose! Start a new game."
+            )
+
+            messagebox.showinfo(
+                "Game Over",
+                "You discarded your last card and ran out of cards!\n\nTry another game.",
+            )
 
 
 if __name__ == "__main__":
