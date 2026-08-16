@@ -59,16 +59,25 @@ class WikiDeckGame:
         target_links = {t.lower() for t in most_frequent_links(self.target_title, limit=12)}
         return sorted(candidates, key=lambda title: title.lower() not in target_links)
 
-    def _fill_replacements(self, count):
+    def _fill_replacements(self, count, exclude=None):
         """Return up to `count` fresh candidate titles not already in the
-        deck or already played, capped so the deck never exceeds
-        MAX_DECK_SIZE. Candidates closer to the target are preferred."""
+        deck, already played, or in ``exclude``. Capped so the deck never
+        exceeds MAX_DECK_SIZE. Candidates closer to the target are
+        preferred.
+
+        The ``exclude`` parameter lets callers (like `discard_cards`) mark
+        recently-removed cards as ineligible for immediate replacement.
+        """
         room = MAX_DECK_SIZE - len(self.deck)
         count = min(count, room)
         if count <= 0:
             return []
 
         seen = self._seen_cards()
+        if exclude:
+            for ex in exclude:
+                seen.add(normalize_title(ex).lower())
+
         replacements = []
         ranked_candidates = self._rank_by_closeness(self._candidate_cards())
         for candidate in ranked_candidates:
@@ -116,7 +125,7 @@ class WikiDeckGame:
                     break
         self.deck = remaining
 
-        replacements = self._fill_replacements(len(discarded) // 5)
+        replacements = self._fill_replacements(len(discarded) // 5, exclude=discarded)
         self.deck.extend(replacements)
 
         return discarded, replacements
